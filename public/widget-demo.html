@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>悬浮挂件演示</title>
+<style>
+  body { margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; color:#1f2328; background:linear-gradient(135deg,#eef2ff,#f8fafc); min-height:100vh; }
+  .hero { max-width:760px; margin:0 auto; padding:80px 24px; }
+  h1 { font-size:34px; margin:0 0 12px; }
+  p { color:#4b5563; line-height:1.7; }
+  code { display:block; background:#0d1117; color:#e6edf3; padding:14px; border-radius:10px; font-size:13px; overflow-x:auto; white-space:pre; }
+</style>
+</head>
+<body>
+  <div class="hero">
+    <h1>这是一个普通网页</h1>
+    <p>右下角的圆形按钮就是悬浮聊天挂件，点击即可弹出聊天窗口，支持上传图片、文档和视频。手机上会全屏打开。</p>
+    <p>在任意网站的 &lt;/body&gt; 前加入下面这一行即可获得同样效果：</p>
+    <code id="snippet"></code>
+  </div>
+  <script>
+    document.getElementById('snippet').textContent = '<script src="' + location.origin + '/widget.js" defer><\/script>';
+  </script>
+  <script src="widget.js" defer></script>
+</body>
+</html>
