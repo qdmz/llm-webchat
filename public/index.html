@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebChat</title>
+<style>
+  :root { --bg:#f7f7f8; --card:#fff; --text:#1f2328; --muted:#6b7280; --accent:#2563eb; --border:#e5e7eb; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); }
+  .app { display:flex; flex-direction:column; height:100%; max-width:900px; margin:0 auto; position:relative; }
+  header { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--card); }
+  header h1 { font-size:16px; margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  select, button, textarea, input { font:inherit; }
+  select { padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:#fff; max-width:200px; min-width:0; }
+  .btn { padding:6px 12px; border:1px solid var(--border); border-radius:8px; background:#fff; cursor:pointer; white-space:nowrap; }
+  .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn.icon { padding:6px 9px; font-size:18px; line-height:1; border:none; background:transparent; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  #chat { flex:1; overflow-y:auto; padding:16px; }
+  .msg { display:flex; flex-direction:column; margin:10px 0; }
+  .msg.user { align-items:flex-end; }
+  .msg.assistant { align-items:flex-start; }
+  .bubble { max-width:85%; padding:10px 14px; border-radius:14px; line-height:1.6; overflow-wrap:anywhere; }
+  .user .bubble { background:var(--accent); color:#fff; white-space:pre-wrap; border-bottom-right-radius:4px; }
+  .assistant .bubble { background:var(--card); border:1px solid var(--border); border-bottom-left-radius:4px; }
+  .bubble pre { background:#0d1117; color:#e6edf3; padding:10px; border-radius:8px; overflow-x:auto; font-size:13px; white-space:pre; }
+  .bubble code { font-family:ui-monospace,Menlo,Consolas,monospace; }
+  .bubble :not(pre) > code { background:#eef0f3; padding:1px 4px; border-radius:4px; }
+  .user .bubble :not(pre) > code { background:rgba(255,255,255,.2); }
+  .bubble a { color:inherit; }
+  .assistant .bubble a { color:var(--accent); }
+  .bubble .mdimg { display:inline-block; position:relative; margin:4px 0; }
+  .bubble .mdimg img { max-width:100%; max-height:360px; border-radius:8px; display:block; cursor:zoom-in; }
+  .bubble .mdimg .dl { position:absolute; right:6px; bottom:6px; background:rgba(0,0,0,.6); color:#fff; padding:2px 8px; border-radius:6px; font-size:12px; text-decoration:none; }
+  .atts { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; max-width:85%; justify-content:flex-end; }
+  .att img, .att video { max-width:220px; max-height:180px; border-radius:10px; display:block; border:1px solid var(--border); background:#000; }
+  .att img { cursor:zoom-in; background:#fff; }
+  .fchip { display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--card); border:1px solid var(--border); border-radius:10px; text-decoration:none; color:var(--text); font-size:13px; max-width:260px; }
+  .fchip .n { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fchip .s { color:var(--muted); font-size:12px; white-space:nowrap; }
+  .error { color:#b91c1c; }
+  details.think { color:var(--muted); font-size:13px; margin-bottom:6px; border-left:3px solid var(--border); padding-left:8px; }
+  details.think summary { cursor:pointer; }
+  details.think div { max-height:240px; overflow:auto; }
+  .empty { text-align:center; color:var(--muted); margin-top:20vh; }
+  footer { padding:10px 14px 14px; background:var(--bg); }
+  .input { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:8px; }
+  .input.drag { border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.15); }
+  .row { display:flex; gap:6px; align-items:flex-end; }
+  textarea { flex:1; border:none; outline:none; resize:none; max-height:200px; min-height:24px; padding:6px 4px; background:transparent; }
+  #pending { display:flex; flex-wrap:wrap; gap:6px; }
+  #pending:not(:empty) { margin-bottom:8px; }
+  .pchip { position:relative; display:flex; align-items:center; gap:6px; padding:4px 26px 4px 4px; border:1px solid var(--border); border-radius:10px; font-size:12px; max-width:220px; background:#fafafa; overflow:hidden; }
+  .pchip .thumb { width:40px; height:40px; border-radius:6px; object-fit:cover; background:#eee; display:flex; align-items:center; justify-content:center; font-size:20px; flex:0 0 40px; }
+  .pchip .n { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pchip .x { position:absolute; right:4px; top:4px; border:none; background:transparent; cursor:pointer; color:var(--muted); font-size:14px; }
+  .pchip .bar { position:absolute; left:0; bottom:0; height:3px; background:var(--accent); transition:width .2s; }
+  .pchip.err { border-color:#fca5a5; color:#b91c1c; }
+  .hint { font-size:12px; color:var(--muted); text-align:center; margin-top:6px; }
+  #lightbox { position:fixed; inset:0; background:rgba(0,0,0,.85); display:none; align-items:center; justify-content:center; z-index:99; cursor:zoom-out; }
+  #lightbox img { max-width:95vw; max-height:90vh; }
+  #lightbox a { position:absolute; bottom:20px; color:#fff; background:rgba(255,255,255,.15); padding:6px 14px; border-radius:8px; text-decoration:none; }
+  body.embed .app { max-width:none; }
+  body.embed header { padding:8px 10px; }
+  body.embed .hint { display:none; }
+  body.embed #chat { padding:10px; }
+  body.embed footer { padding:8px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1 id="title">💬 WebChat</h1>
+    <select id="model" title="选择模型"></select>
+    <button class="btn" id="newChat">新对话</button>
+  </header>
+  <div id="chat"><div class="empty">开始聊天吧</div></div>
+  <footer>
+    <div class="input" id="inputBox">
+      <div id="pending"></div>
+      <div class="row">
+        <button class="btn icon" id="attach" title="上传图片 / 文档 / 视频">📎</button>
+        <input type="file" id="file" multiple hidden>
+        <textarea id="input" rows="1" placeholder="输入消息，Enter 发送，Shift+Enter 换行；可粘贴或拖入文件"></textarea>
+        <button class="btn primary" id="send">发送</button>
+      </div>
+    </div>
+    <div class="hint">对话保存在本浏览器，上传文件会在服务器保留一段时间后自动删除</div>
+  </footer>
+</div>
+<div id="lightbox"><img alt=""><a download target="_blank">下载原图</a></div>
+<script>
+const $ = s => document.querySelector(s);
+const params = new URLSearchParams(location.search);
+const EMBED = params.has('embed');
+if (EMBED) document.body.classList.add('embed');
+const chatEl = $('#chat'), inputEl = $('#input'), sendBtn = $('#send'), modelEl = $('#model'), pendingEl = $('#pending');
+const STORE = EMBED ? 'wc_messages_embed' : 'wc_messages';
+let messages = JSON.parse(localStorage.getItem(STORE) || '[]');
+let controller = null, cfg = { maxUploadMB: 20 }, pending = [];
+
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtSize(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + 'MB' : Math.max(1, Math.round(n / 1024)) + 'KB'; }
+function icon(kind) { return { image:'🖼️', video:'🎬', audio:'🎵', doc:'📄' }[kind] || '📎'; }
+function safeUrl(u) { return /^(https?:\/\/|data:image\/|uploads\/|\/uploads\/)/i.test(u) ? u : '#'; }
+
+// 轻量 Markdown：代码块、行内代码、图片（带下载）、链接、粗体、斜体、标题、列表
+function md(src) {
+  const blocks = [];
+  const keep = h => { blocks.push(h); return '\u0000' + (blocks.length - 1) + '\u0000'; };
+  src = src.replace(/```(\w*)\n?([\s\S]*?)(```|$)/g, (_, l, code) => keep('<pre><code>' + esc(code) + '</code></pre>'));
+  src = src.replace(/`([^`\n]+)`/g, (_, c) => keep('<code>' + esc(c) + '</code>'));
+  src = src.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt, u) => { u = safeUrl(u); return keep(`<span class="mdimg"><img src="${esc(u)}" alt="${esc(alt)}"><a class="dl" href="${esc(u)}" download target="_blank">下载</a></span>`); });
+  src = src.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, t, u) => keep(`<a href="${esc(safeUrl(u))}" target="_blank" rel="noopener">${esc(t)}</a>`));
+  let h = esc(src)
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>')
+    .replace(/^&gt;\s?(.*)$/gm, '<span style="color:#92400e;background:#fef3c7;padding:2px 6px;border-radius:6px;display:inline-block">$1</span>')
+    .replace(/^#{1,6}\s+(.*)$/gm, '<b>$1</b>')
+    .replace(/^\s*[-*]\s+(.*)$/gm, '• $1')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>')
+    .replace(/\n/g, '<br>');
+  return h.replace(/\u0000(\d+)\u0000/g, (_, i) => blocks[i]);
+}
+function save() { localStorage.setItem(STORE, JSON.stringify(messages)); }
+
+function attHtml(a) {
+  const u = esc(a.url);
+  if (a.kind === 'image') return `<div class="att"><img src="${u}" alt="${esc(a.name)}" data-full="${u}"></div>`;
+  if (a.kind === 'video') return `<div class="att"><video src="${u}" controls preload="metadata"></video></div>`;
+  if (a.kind === 'audio') return `<div class="att"><audio src="${u}" controls></audio></div>`;
+  return `<a class="fchip" href="${u}?dl" target="_blank">${icon(a.kind)}<span class="n">${esc(a.name)}</span><span class="s">${fmtSize(a.size)} ⬇</span></a>`;
+}
+function addMsg(role, content, atts, isErr) {
+  const wrap = document.createElement('div'); wrap.className = 'msg ' + role;
+  if (atts && atts.length) { const d = document.createElement('div'); d.className = 'atts'; d.innerHTML = atts.map(attHtml).join(''); wrap.appendChild(d); }
+  const b = document.createElement('div'); b.className = 'bubble' + (isErr ? ' error' : '');
+  if (role === 'user') { b.textContent = content; if (!content) b.style.display = 'none'; }
+  else b.innerHTML = md(content || '…');
+  wrap.appendChild(b); chatEl.appendChild(wrap);
+  chatEl.scrollTop = chatEl.scrollHeight;
+  return b;
+}
+function render() {
+  if (!messages.length) { chatEl.innerHTML = '<div class="empty">开始聊天吧</div>'; return; }
+  chatEl.innerHTML = '';
+  messages.forEach(m => addMsg(m.role, m.content, m.attachments));
+}
+
+// 图片放大
+chatEl.addEventListener('click', e => {
+  const img = e.target.closest('.att img, .mdimg img'); if (!img) return;
+  const lb = $('#lightbox'); lb.querySelector('img').src = img.src; lb.querySelector('a').href = img.src; lb.style.display = 'flex';
+});
+$('#lightbox').onclick = e => { if (e.target.tagName !== 'A') e.currentTarget.style.display = 'none'; };
+
+function accessHeaders() {
+  const h = {};
+  if (cfg.needAccessCode) {
+    let code = localStorage.getItem('wc_code');
+    if (!code) { code = prompt('请输入访问口令') || ''; localStorage.setItem('wc_code', code); }
+    h['X-Access-Code'] = code;
+  }
+  return h;
+}
+
+// ---------- 上传 ----------
+function renderPending() {
+  pendingEl.innerHTML = '';
+  pending.forEach((p, i) => {
+    const el = document.createElement('div'); el.className = 'pchip' + (p.error ? ' err' : '');
+    const thumb = p.preview ? `<img class="thumb" src="${p.preview}">` : `<span class="thumb">${icon(p.kind)}</span>`;
+    el.innerHTML = `${thumb}<span class="n" title="${esc(p.name)}">${esc(p.error || p.name)}</span><button class="x" title="移除">✕</button>${p.done || p.error ? '' : `<span class="bar" style="width:${p.progress}%"></span>`}`;
+    el.querySelector('.x').onclick = () => { if (p.xhr && !p.done) p.xhr.abort(); pending.splice(i, 1); renderPending(); };
+    pendingEl.appendChild(el);
+  });
+  updateSend();
+}
+function updateSend() { sendBtn.disabled = !controller && pending.some(p => !p.done && !p.error); }
+function guessKind(f) { const t = f.type || ''; return t.startsWith('image/') ? 'image' : t.startsWith('video/') ? 'video' : t.startsWith('audio/') ? 'audio' : 'doc'; }
+function addFiles(files) {
+  for (const f of files) {
+    const p = { name: f.name || 'pasted.png', size: f.size, kind: guessKind(f), progress: 0, done: false };
+    if (f.size > cfg.maxUploadMB * 1048576) { p.error = `${p.name} 超过 ${cfg.maxUploadMB}MB`; pending.push(p); continue; }
+    if (p.kind === 'image') p.preview = URL.createObjectURL(f);
+    pending.push(p);
+    const xhr = new XMLHttpRequest(); p.xhr = xhr;
+    xhr.open('POST', 'api/upload');
+    xhr.setRequestHeader('X-Filename', encodeURIComponent(p.name));
+    xhr.setRequestHeader('Content-Type', f.type || 'application/octet-stream');
+    for (const [k, v] of Object.entries(accessHeaders())) xhr.setRequestHeader(k, v);
+    xhr.upload.onprogress = e => { if (e.lengthComputable) { p.progress = e.loaded / e.total * 100; const bar = pendingEl.children[pending.indexOf(p)]?.querySelector('.bar'); if (bar) bar.style.width = p.progress + '%'; } };
+    xhr.onload = () => {
+      let r = {}; try { r = JSON.parse(xhr.responseText); } catch {}
+      if (xhr.status === 200) { Object.assign(p, r, { done: true }); }
+      else { p.error = r.error || '上传失败'; if (xhr.status === 401) localStorage.removeItem('wc_code'); }
+      renderPending();
+    };
+    xhr.onerror = () => { p.error = '上传失败'; renderPending(); };
+    xhr.send(f);
+  }
+  renderPending();
+}
+$('#attach').onclick = () => $('#file').click();
+$('#file').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+inputEl.addEventListener('paste', e => { const fs = [...(e.clipboardData?.files || [])]; if (fs.length) { e.preventDefault(); addFiles(fs); } });
+const box = $('#inputBox');
+['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); box.classList.add('drag'); } }));
+['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { if (ev === 'dragleave' && e.relatedTarget) return; box.classList.remove('drag'); }));
+document.addEventListener('drop', e => { if (e.dataTransfer?.files?.length) { e.preventDefault(); addFiles(e.dataTransfer.files); } });
+
+// ---------- 聊天 ----------
+async function loadConfig() {
+  cfg = await (await fetch('api/config')).json();
+  const saved = localStorage.getItem('wc_model');
+  modelEl.innerHTML = cfg.models.map(m => `<option value="${esc(m.value)}">${esc(m.label)}</option>`).join('');
+  modelEl.value = cfg.models.some(m => m.value === saved) ? saved : cfg.defaultModel;
+  if (EMBED && cfg.widgetTitle) $('#title').textContent = cfg.widgetTitle;
+  if (EMBED && cfg.models.length < 2) modelEl.style.display = 'none';
+  updatePlaceholder();
+}
+function updatePlaceholder() {
+  const m = (cfg.models || []).find(x => x.value === modelEl.value);
+  inputEl.placeholder = m && m.type === 'systemone' ? '决策模型：输入需要判定的内容（或发送 {"state":…,"questions":{…}} JSON）' : '输入消息，Enter 发送，Shift+Enter 换行；可粘贴或拖入文件';
+}
+modelEl.onchange = () => { localStorage.setItem('wc_model', modelEl.value); updatePlaceholder(); };
+
+async function send() {
+  if (controller) { controller.abort(); return; }
+  const text = inputEl.value.trim();
+  const atts = pending.filter(p => p.done).map(({ id, name, mime, size, kind, url }) => ({ id, name, mime, size, kind, url }));
+  if (!text && !atts.length) return;
+  if (pending.some(p => !p.done && !p.error)) return;
+  if (!messages.length) chatEl.innerHTML = '';
+  const userMsg = { role: 'user', content: text, attachments: atts };
+  messages.push(userMsg); save();
+  addMsg('user', text, atts);
+  inputEl.value = ''; autosize(); pending = []; renderPending();
+  const bubble = addMsg('assistant', '');
+  bubble.innerHTML = atts.length ? '<span style="color:#6b7280">正在处理附件…</span>' : '…';
+  let reply = '', think = '';
+  const paint = () => { bubble.innerHTML = (think ? `<details class="think"${reply ? '' : ' open'}><summary>${reply ? '已思考' : '思考中…'}</summary><div>${esc(think).replace(/\n/g, '<br>')}</div></details>` : '') + (reply ? md(reply) : ''); chatEl.scrollTop = chatEl.scrollHeight; };
+  controller = new AbortController();
+  sendBtn.textContent = '停止'; updateSend();
+  try {
+    const payload = messages.map(m => ({ role: m.role, content: m.content, attachments: (m.attachments || []).map(a => a.id) }));
+    const r = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json', ...accessHeaders() }, signal: controller.signal, body: JSON.stringify({ model: modelEl.value, messages: payload }) });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({ error: r.statusText }));
+      if (r.status === 401) localStorage.removeItem('wc_code');
+      throw new Error(e.error || r.statusText);
+    }
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n'); buf = lines.pop();
+      for (const line of lines) {
+        const l = line.trim();
+        if (!l.startsWith('data:')) continue;
+        const d = l.slice(5).trim(); if (d === '[DONE]') continue;
+        try {
+          const j = JSON.parse(d);
+          const delta = j.choices?.[0]?.delta || {};
+          let piece = '';
+          if (typeof delta.content === 'string') piece = delta.content;
+          else if (Array.isArray(delta.content)) piece = delta.content.map(c => c.type === 'image_url' ? `\n![image](${c.image_url?.url})\n` : (c.text || '')).join('');
+          if (Array.isArray(delta.images)) piece += delta.images.map(im => `\n![image](${im.image_url?.url || im.url})\n`).join('');
+          const rc = delta.reasoning_content || delta.reasoning || '';
+          if (rc) think += rc;
+          if (piece) reply += piece;
+          if (piece || rc) paint();
+        } catch {}
+      }
+    }
+  } catch (e) {
+    if (e.name !== 'AbortError') { bubble.classList.add('error'); bubble.textContent = '出错了：' + e.message; }
+  } finally {
+    if (reply) { messages.push({ role: 'assistant', content: reply }); save(); }
+    else {
+      if (!bubble.classList.contains('error')) bubble.parentElement.remove();
+      messages.pop(); save();   // 失败则撤回这条用户消息，便于重发
+      if (!inputEl.value) { inputEl.value = text; autosize(); }
+      if (atts.length && !pending.length) { pending = atts.map(a => ({ ...a, done: true, preview: a.kind === 'image' ? a.url : null })); renderPending(); }
+    }
+    controller = null; sendBtn.textContent = '发送'; updateSend();
+  }
+}
+function autosize() { inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + 'px'; }
+inputEl.addEventListener('input', autosize);
+inputEl.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
+sendBtn.onclick = send;
+$('#newChat').onclick = () => { if (controller) controller.abort(); messages = []; save(); render(); };
+loadConfig(); render();
+</script>
+</body>
+</html>
