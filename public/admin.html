@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebChat 设置</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:#f7f7f8; color:#1f2328; }
+  .wrap { max-width:720px; margin:30px auto; padding:0 12px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:20px 22px; margin-bottom:16px; }
+  h1 { font-size:20px; margin:0; }
+  h2 { font-size:16px; margin:0 0 6px; }
+  label { display:block; font-size:13px; color:#374151; margin:12px 0 4px; font-weight:600; }
+  input, textarea, select { width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:8px; font:inherit; background:#fff; }
+  textarea { min-height:70px; }
+  textarea.code { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; min-height:180px; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .row > * { flex:1; min-width:0; }
+  .btn { padding:8px 14px; border:1px solid #d1d5db; border-radius:8px; background:#fff; cursor:pointer; font:inherit; flex:0 0 auto; white-space:nowrap; }
+  .btn.primary { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .btn.danger { color:#b91c1c; border-color:#fecaca; }
+  .btn.sm { padding:4px 10px; font-size:13px; }
+  .hint { font-size:12px; color:#6b7280; margin-top:4px; }
+  .msg { margin-top:12px; font-size:14px; min-height:1em; }
+  .ok { color:#047857; } .err { color:#b91c1c; }
+  .models { max-height:200px; overflow:auto; border:1px solid #e5e7eb; border-radius:8px; padding:6px 8px; margin-top:8px; }
+  .models label { font-weight:400; display:flex; gap:6px; margin:2px 0; align-items:center; }
+  .models input { width:auto; }
+  .prov { border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-top:12px; background:#fcfcfd; }
+  .prov-head { display:flex; gap:8px; align-items:center; }
+  .tag { font-size:12px; padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; }
+  .hidden { display:none !important; }
+  .top { display:flex; align-items:center; margin-bottom:16px; }
+  .top h1 { flex:1; }
+  a { color:#2563eb; }
+  .sticky { position:sticky; bottom:0; background:#f7f7f8; padding:12px 0; display:flex; gap:10px; align-items:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="login" class="card">
+    <h1>🔐 管理员登录</h1>
+    <label>管理员密码</label>
+    <input type="password" id="pwd">
+    <div style="margin-top:14px"><button class="btn primary" id="loginBtn">登录</button></div>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+
+  <div id="panel" class="hidden">
+    <div class="top"><h1>⚙️ WebChat 设置</h1><a href="./">← 返回聊天</a></div>
+
+    <div class="card">
+      <div class="row"><h2 style="flex:1">模型服务商</h2><button class="btn sm" id="addProv">＋ 添加服务商</button></div>
+      <div class="hint">每个服务商可以有不同的地址和 Key；勾选的模型会出现在聊天页下拉框。支持 OpenAI 兼容、Anthropic 兼容两种对话协议；「决策模型（SystemOne）」用于分类 / 是否判断 / 打分，不生成文字。</div>
+      <div class="row" style="margin-top:10px;flex-wrap:wrap;gap:6px" id="presets"></div>
+      <div id="provs"></div>
+      <label>默认模型</label>
+      <select id="defaultModel"></select>
+    </div>
+
+    <div class="card">
+      <h2>对话</h2>
+      <label>系统提示词</label>
+      <textarea id="systemPrompt"></textarea>
+      <label>Temperature</label>
+      <input id="temperature" type="number" step="0.1" min="0" max="2">
+      <label>访问控制</label>
+      <div class="row">
+        <select id="publicAccess"><option value="true">公开（任何人可聊天）</option><option value="false">需要访问口令</option></select>
+        <input id="accessCode" placeholder="访问口令">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>多模态</h2>
+      <div class="row">
+        <select id="vision"><option value="true">图片发给模型识别（需模型支持视觉）</option><option value="false">不发送图片</option></select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <select id="videoMode"><option value="frames">视频：抽帧成图片发送（通用）</option><option value="video_url">视频：发送视频链接（如通义千问 VL）</option><option value="off">视频：不发送</option></select>
+        <input id="videoFrames" type="number" min="1" max="16" title="抽帧数量" placeholder="抽帧数">
+      </div>
+      <div class="row" style="margin-top:8px">
+        <input id="maxUploadMB" type="number" min="1" max="200" title="单文件上限 MB" placeholder="单文件上限 MB">
+        <input id="retentionDays" type="number" min="1" max="365" title="文件保留天数" placeholder="保留天数">
+      </div>
+      <div class="hint">依次为：抽帧数量；单文件上限（MB，同时受 Nginx client_max_body_size 限制）；上传文件保留天数。</div>
+    </div>
+
+    <div class="card">
+      <h2>悬浮挂件</h2>
+      <div class="row">
+        <input id="widgetTitle" placeholder="挂件标题">
+        <input id="widgetColor" type="color" style="flex:0 0 60px;padding:2px">
+      </div>
+      <div class="hint">把下面这行放到任意网页的 &lt;/body&gt; 前即可（<a href="widget-demo.html" target="_blank">看演示</a>）：</div>
+      <input id="embedCode" readonly onclick="this.select()" style="font-family:monospace;font-size:12px;margin-top:4px">
+    </div>
+
+    <div class="sticky">
+      <button class="btn primary" id="saveBtn">保存全部设置</button>
+      <span class="msg" id="msg" style="margin:0"></span>
+    </div>
+
+    <div class="card">
+      <h2>修改管理员密码</h2>
+      <div class="hint" id="pwHint"></div>
+      <div class="row" style="margin-top:8px">
+        <input type="password" id="oldPw" placeholder="当前密码" autocomplete="current-password">
+        <input type="password" id="newPw" placeholder="新密码（至少 8 位）" autocomplete="new-password">
+        <input type="password" id="newPw2" placeholder="再输一次" autocomplete="new-password">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="pwBtn" style="flex:0 0 auto">修改密码</button>
+        <span></span>
+        <button class="btn" id="logoutBtn" style="flex:0 0 auto">退出登录</button>
+      </div>
+      <div class="msg" id="pwMsg"></div>
+    </div>
+  </div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+let token = sessionStorage.getItem('wc_admin') || '';
+let provs = [];   // {id,name,type,baseUrl,apiKey,apiKeyMasked,models:[],all:[],questions}
+let currentDefault = '';
+const api = (p, body) => fetch('api/admin/' + p, {
+  method: body ? 'POST' : 'GET',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+  body: body ? JSON.stringify(body) : undefined
+}).then(async r => { const j = await r.json().catch(() => ({})); if (r.status === 401 && p !== 'password') { sessionStorage.removeItem('wc_admin'); location.reload(); } if (!r.ok) throw new Error(j.error || r.statusText); return j; });
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function show(el, text, ok) { el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); }
+const DEFAULT_Q = JSON.stringify({
+  intent: { type: 'choice', instructions: '这段内容属于哪类诉求？', criteria: { consult: '咨询', complaint: '投诉', tech: '技术问题', other: '其他' } },
+  urgent: { type: 'noul', instructions: '是否需要紧急处理？' },
+  severity: { type: 'score', instructions: '严重程度', criteria: ['轻微', '一般', '严重', '非常严重'] }
+}, null, 2);
+
+function renderProvs() {
+  const box = $('#provs'); box.innerHTML = '';
+  provs.forEach((p, i) => {
+    const isSO = p.type === 'systemone', isAn = p.type === 'anthropic', isGm = p.type === 'gemini';
+    const list = [...new Set([...p.models, ...p.all])];
+    const el = document.createElement('div'); el.className = 'prov';
+    el.innerHTML = `
+      <div class="prov-head">
+        <input data-k="name" value="${esc(p.name)}" placeholder="名称，如：云知声 / DeepSeek" style="flex:1">
+        <select data-k="type" style="flex:0 0 200px">
+          <option value="openai" ${p.type === 'openai' ? 'selected' : ''}>对话模型（OpenAI 兼容）</option>
+          <option value="anthropic" ${isAn ? 'selected' : ''}>对话模型（Anthropic / Claude）</option>
+          <option value="gemini" ${isGm ? 'selected' : ''}>对话模型（Google Gemini）</option>
+          <option value="systemone" ${isSO ? 'selected' : ''}>决策模型（SystemOne）</option>
+        </select>
+        <button class="btn sm danger" data-act="del" title="删除">删除</button>
+      </div>
+      <label>Base URL</label>
+      <input data-k="baseUrl" value="${esc(p.baseUrl)}" placeholder="${isSO ? 'https://maas-api.unisound.com/v1' : isGm ? 'https://generativelanguage.googleapis.com/v1beta' : isAn ? 'https://api.anthropic.com/v1' : 'https://api.deepseek.com/v1'}">
+      <div class="hint">${isSO ? '会请求 {Base URL}/systemone' : isGm ? '会请求 {Base URL}/models/{模型}:streamGenerateContent' : isAn ? '会请求 {Base URL}/messages，填到 /v1 为止。云知声为 https://maas-api.unisound.com/anthropic/v1' : '会请求 {Base URL}/chat/completions，通常以 /v1 结尾'}</div>
+      ${isAn ? `<label>最大输出 Token（max_tokens）</label><input data-k="maxTokens" type="number" min="256" max="200000" value="${esc(p.maxTokens || 8192)}">` : ''}
+      <label>API Key</label>
+      <input data-k="apiKey" type="password" value="${esc(p.apiKey)}" placeholder="${p.apiKeyMasked ? '当前：' + esc(p.apiKeyMasked) + '（留空不修改）' : '尚未设置'}">
+      <label>模型</label>
+      <div class="row">
+        <input data-k="custom" placeholder="${isSO ? '如 u2-decision，回车添加' : '手动添加模型名，回车添加'}">
+        ${isSO ? '' : '<button class="btn sm" data-act="fetch">从接口获取</button>'}
+      </div>
+      <div class="models">${list.length ? list.map(m => `<label><input type="checkbox" value="${esc(m)}" ${p.models.includes(m) ? 'checked' : ''}>${esc(m)}</label>`).join('') : '<span class="hint">暂无模型</span>'}</div>
+      ${isSO ? `<label>决策问题（JSON）</label>
+      <textarea class="code" data-k="questions">${esc(p.questions || DEFAULT_Q)}</textarea>
+      <div class="hint">聊天时发送的内容作为 state，按这些问题判定。type 可选 choice（多选一）/ noul（是否）/ score（打分）。用户也可直接发送 {"state": "...", "questions": {...}} 临时自定义。</div>` : ''}
+      <div class="msg" data-k="msg"></div>`;
+    el.querySelectorAll('[data-k]').forEach(inp => {
+      const k = inp.dataset.k;
+      if (['name', 'baseUrl', 'apiKey', 'questions', 'maxTokens'].includes(k)) inp.oninput = () => { p[k] = inp.value; if (k === 'name') renderDefault(); };
+    });
+    el.querySelector('[data-k=type]').onchange = e => {
+      p.type = e.target.value;
+      if (p.type === 'anthropic' && !p.maxTokens) p.maxTokens = 8192;
+      if (p.type === 'systemone') { if (!p.questions) p.questions = DEFAULT_Q; if (!p.models.length) p.models = ['u2-decision']; if (!p.baseUrl) p.baseUrl = 'https://maas-api.unisound.com/v1'; }
+      renderProvs();
+    };
+    el.querySelector('[data-act=del]').onclick = () => { if (provs.length < 2) return alert('至少保留一个服务商'); if (confirm(`删除「${p.name}」？保存后生效`)) { provs.splice(i, 1); renderProvs(); } };
+    el.querySelector('[data-k=custom]').onkeydown = e => {
+      if (e.key !== 'Enter') return;
+      const v = e.target.value.trim(); if (!v) return;
+      if (!p.models.includes(v)) p.models.push(v); renderProvs();
+    };
+    el.querySelectorAll('.models input').forEach(cb => cb.onchange = () => { cb.checked ? p.models.push(cb.value) : p.models = p.models.filter(m => m !== cb.value); renderDefault(); });
+    const fb = el.querySelector('[data-act=fetch]');
+    if (fb) fb.onclick = async () => {
+      const m = el.querySelector('[data-k=msg]'); show(m, '获取中…', true);
+      try { const r = await api('models', { providerId: p.id, type: p.type, baseUrl: p.baseUrl, apiKey: p.apiKey }); p.all = r.models; renderProvs(); }
+      catch (e) { show(m, e.message); }
+    };
+    box.appendChild(el);
+  });
+  renderDefault();
+}
+function renderDefault() {
+  const sel = $('#defaultModel');
+  const cur = sel.value || currentDefault;
+  const multi = provs.length > 1;
+  const opts = []; provs.forEach(p => p.models.forEach(m => opts.push([`${p.id}::${m}`, m + (multi ? ` · ${p.name}` : '')])));
+  sel.innerHTML = opts.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+  if (opts.some(o => o[0] === cur)) sel.value = cur;
+}
+const PRESETS = [
+  ['OpenAI', 'openai', 'https://api.openai.com/v1'],
+  ['Claude', 'anthropic', 'https://api.anthropic.com/v1'],
+  ['Gemini', 'gemini', 'https://generativelanguage.googleapis.com/v1beta'],
+  ['DeepSeek', 'openai', 'https://api.deepseek.com/v1'],
+  ['通义千问', 'openai', 'https://dashscope.aliyuncs.com/compatible-mode/v1'],
+  ['Kimi', 'openai', 'https://api.moonshot.cn/v1'],
+  ['智谱 GLM', 'openai', 'https://open.bigmodel.cn/api/paas/v4'],
+  ['硅基流动', 'openai', 'https://api.siliconflow.cn/v1'],
+  ['OpenRouter', 'openai', 'https://openrouter.ai/api/v1'],
+  ['云知声', 'openai', 'https://maas-api.unisound.com/v1'],
+  ['云知声 决策', 'systemone', 'https://maas-api.unisound.com/v1']
+];
+$('#presets').innerHTML = '<span class="hint" style="flex:0 0 auto;margin:0">快速添加：</span>' + PRESETS.map((x, i) => `<button class="btn sm" data-i="${i}" style="flex:0 0 auto">${x[0]}</button>`).join('');
+$('#presets').onclick = e => {
+  const i = e.target.dataset.i; if (i === undefined) return;
+  const [name, type, baseUrl] = PRESETS[i];
+  provs.push({ id: 'p' + Math.random().toString(16).slice(2, 8), name, type, baseUrl, apiKey: '', models: type === 'systemone' ? ['u2-decision'] : [], all: [], questions: type === 'systemone' ? DEFAULT_Q : '', maxTokens: 8192 });
+  renderProvs(); document.querySelector('#provs .prov:last-child [data-k=apiKey]').focus();
+};
+$('#addProv').onclick = () => { provs.push({ id: 'p' + Math.random().toString(16).slice(2, 8), name: '', type: 'openai', baseUrl: '', apiKey: '', models: [], all: [], questions: '' }); renderProvs(); };
+
+async function loadPanel() {
+  const c = await api('config');
+  $('#login').classList.add('hidden'); $('#panel').classList.remove('hidden');
+  provs = c.providers.map(p => ({ ...p, apiKey: '', all: [], models: [...(p.models || [])] }));
+  currentDefault = c.defaultModel;
+  $('#defaultModel').value = '';
+  renderProvs();
+  $('#systemPrompt').value = c.systemPrompt;
+  $('#temperature').value = c.temperature;
+  $('#publicAccess').value = String(c.publicAccess);
+  $('#accessCode').value = c.accessCode || '';
+  $('#vision').value = String(c.vision);
+  $('#videoMode').value = c.videoMode; $('#videoFrames').value = c.videoFrames;
+  $('#maxUploadMB').value = c.maxUploadMB; $('#retentionDays').value = c.retentionDays;
+  $('#widgetTitle').value = c.widgetTitle; $('#widgetColor').value = c.widgetColor;
+  $('#pwHint').textContent = c.passwordFromEnv ? '当前使用的是启动时设置的密码，修改后以新密码为准。' : '修改后其他已登录的设备会被退出。';
+  updateEmbed();
+}
+function updateEmbed() {
+  const base = location.href.replace(/admin(\.html)?([?#].*)?$/, '');
+  $('#embedCode').value = `<script src="${base}widget.js" data-title="${$('#widgetTitle').value}" data-color="${$('#widgetColor').value}" defer><\/script>`;
+}
+$('#widgetTitle').oninput = $('#widgetColor').oninput = updateEmbed;
+
+$('#loginBtn').onclick = async () => {
+  try {
+    const r = await fetch('api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: $('#pwd').value }) });
+    const j = await r.json(); if (!r.ok) throw new Error(j.error);
+    token = j.token; sessionStorage.setItem('wc_admin', token); loadPanel();
+  } catch (e) { show($('#loginMsg'), e.message); }
+};
+$('#pwd').onkeydown = e => { if (e.key === 'Enter') $('#loginBtn').click(); };
+
+$('#saveBtn').onclick = async () => {
+  if ($('#publicAccess').value === 'false' && !$('#accessCode').value.trim()) return show($('#msg'), '请填写访问口令');
+  for (const p of provs) {
+    if (!p.baseUrl.trim()) return show($('#msg'), `请填写「${p.name || '未命名'}」的 Base URL`);
+    if (p.type === 'systemone') { try { JSON.parse(p.questions || DEFAULT_Q); } catch { return show($('#msg'), `「${p.name}」的决策问题不是合法 JSON`); } }
+  }
+  if (!$('#defaultModel').value) return show($('#msg'), '请至少勾选一个模型');
+  try {
+    await api('config', {
+      providers: provs.map(p => ({ id: p.id, name: p.name, type: p.type, baseUrl: p.baseUrl, apiKey: p.apiKey, models: p.models, questions: p.type === 'systemone' ? (p.questions || DEFAULT_Q) : '', maxTokens: p.maxTokens })),
+      defaultModel: $('#defaultModel').value,
+      systemPrompt: $('#systemPrompt').value, temperature: $('#temperature').value,
+      publicAccess: $('#publicAccess').value === 'true', accessCode: $('#accessCode').value.trim(),
+      vision: $('#vision').value === 'true', videoMode: $('#videoMode').value, videoFrames: $('#videoFrames').value,
+      maxUploadMB: $('#maxUploadMB').value, retentionDays: $('#retentionDays').value,
+      widgetTitle: $('#widgetTitle').value, widgetColor: $('#widgetColor').value
+    });
+    await loadPanel(); show($('#msg'), '已保存 ✓', true);
+  } catch (e) { show($('#msg'), e.message); }
+};
+
+$('#pwBtn').onclick = async () => {
+  const m = $('#pwMsg');
+  if ($('#newPw').value !== $('#newPw2').value) return show(m, '两次输入的新密码不一致');
+  try {
+    await api('password', { oldPassword: $('#oldPw').value, newPassword: $('#newPw').value });
+    ['#oldPw', '#newPw', '#newPw2'].forEach(s => $(s).value = '');
+    show(m, '密码已修改 ✓', true);
+  } catch (e) { show(m, e.message); }
+};
+$('#logoutBtn').onclick = async () => { try { await api('logout', {}); } catch {} sessionStorage.removeItem('wc_admin'); location.reload(); };
+
+if (token) loadPanel().catch(() => { sessionStorage.removeItem('wc_admin'); token = ''; });
+</script>
+</body>
+</html>
