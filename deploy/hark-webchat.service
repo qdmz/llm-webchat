@@ -1,0 +1,14 @@
+[Unit]
+Description=LLM WebChat (hark.freehost.ypvps.com)
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/llm-webchat
+Environment=ADMIN_PASSWORD=请改成你的初始密码
+Environment=PORT=3210
+Environment=HOST=127.0.0.1
+ExecStart=/usr/bin/node server.js
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
