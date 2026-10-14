@@ -111,7 +111,7 @@ let config = loadConfig();
 // ---------- 管理员会话 ----------
 const sessions = new Map();
 function newSession() { const t = crypto.randomBytes(24).toString('hex'); sessions.set(t, Date.now() + 12 * 3600e3); return t; }
-function bearer(req) { return (req.headers['authorization'] || '').replace(/^Bearer\s+/i, ''); }
+function bearer(req) { return String(req.headers['x-admin-token'] || (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '')).trim(); }
 function isAdmin(req) {
   const exp = sessions.get(bearer(req));
   if (!exp) return false;
