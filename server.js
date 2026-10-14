@@ -16,7 +16,7 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-if (!ADMIN_PASSWORD) console.warn('[警告] 未设置 ADMIN_PASSWORD 环境变量，设置页将无法登录。');
+if (!ADMIN_PASSWORD && !process.env.ADMIN_PASSWORD_HASH && !fs.existsSync(path.join(__dirname, "admin.hash"))) console.warn("[警告] 未设置 ADMIN_PASSWORD，设置页将无法登录。");
 
 // ---------- 配置 ----------
 const DEFAULT_CONFIG = {
@@ -58,7 +58,21 @@ function loadConfig() {
   let c;
   try { c = { ...DEFAULT_CONFIG, ...JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) }; }
   catch { c = { ...DEFAULT_CONFIG }; }
-  return normalizeConfig(c);
+  return applyEnvProvider(normalizeConfig(c));
+}
+// 通过环境变量预置服务商（适合无持久磁盘的云平台）：LLM_API_KEY / LLM_BASE_URL / LLM_MODELS(逗号分隔) / LLM_PROVIDER_NAME
+function applyEnvProvider(c) {
+  const key = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY;
+  if (!key) return c;
+  const models = String(process.env.LLM_MODELS || process.env.DEFAULT_MODEL || 'gpt-4o-mini').split(',').map(s => s.trim()).filter(Boolean);
+  const env = { id: 'penv', name: process.env.LLM_PROVIDER_NAME || '默认', type: 'openai',
+    baseUrl: (process.env.LLM_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, ''),
+    apiKey: key, models, questions: '', fromEnv: true };
+  // 去掉没有 key 的占位服务商，替换旧的 env 服务商
+  c.providers = [env, ...c.providers.filter(p => p.id !== 'penv' && p.apiKey)];
+  const valid = c.providers.some(p => (p.models || []).some(m => `${p.id}::${m}` === c.defaultModel) && p.apiKey);
+  if (!valid) c.defaultModel = `penv::${models[0]}`;
+  return c;
 }
 function modelList() {
   const multi = config.providers.length > 1;
@@ -82,7 +96,14 @@ function checkPassword(pw) {
     const [salt, h] = config.adminPasswordHash.split(':');
     return safeEqual(crypto.scryptSync(String(pw), salt, 32).toString('hex'), h);
   }
-  return !!ADMIN_PASSWORD && safeEqual(pw, ADMIN_PASSWORD);
+  if (ADMIN_PASSWORD) return safeEqual(pw, ADMIN_PASSWORD);
+  // 无环境变量时可用仓库内 admin.hash（scrypt "salt:hash"），适合不能设置环境变量的平台
+  const fileHash = process.env.ADMIN_PASSWORD_HASH || (() => { try { return fs.readFileSync(path.join(__dirname, 'admin.hash'), 'utf8').trim(); } catch { return ''; } })();
+  if (fileHash.includes(':')) {
+    const [salt, h] = fileHash.split(':');
+    return safeEqual(crypto.scryptSync(String(pw), salt, 32).toString('hex'), h);
+  }
+  return false;
 }
 function saveConfig(cfg) { fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), { mode: 0o600 }); }
 let config = loadConfig();
